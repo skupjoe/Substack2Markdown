@@ -5,7 +5,7 @@
  * them as ../images/... from the markdown file. Post pages live one directory
  * deeper (/posts/<author>/posts/<slug>/), so those relative URLs 404, and most
  * of the references are links rather than images. This publishes the files at
- * /images/<author>/... and rewrites those links into <img> tags.
+ * /images/<author>/... and rewrites local and remote image links into <img> tags.
  */
 
 import fs from 'node:fs';
@@ -17,6 +17,7 @@ import type { Plugin } from 'vite';
 import { getContentPath } from '../server/paths';
 
 const IMAGE_EXTENSIONS = new Set(['.avif', '.gif', '.jpeg', '.jpg', '.png', '.svg', '.webp']);
+const REMOTE_IMAGE_FORMATS = new Set(['avif', 'gif', 'jpeg', 'jpg', 'png', 'svg', 'webp']);
 
 const IMAGE_CONTENT_TYPES: Record<string, string> = {
   '.avif': 'image/avif',
@@ -97,6 +98,40 @@ export function resolveLocalContentImage(
     filePath: imageFilePath,
     publicUrl: joinSiteBase(siteBase, publicPath),
   };
+}
+
+/**
+ * Detect a remote URL that serves an image even when the path has no file extension.
+ *
+ * Unsplash photo URLs, for example, end in a query such as `fm=jpg` rather than `.jpg`.
+ */
+export function isRemoteImageUrl(href: string): boolean {
+  let imageUrl: URL;
+  try {
+    imageUrl = new URL(href);
+  } catch {
+    return false;
+  }
+  if (imageUrl.protocol !== 'http:' && imageUrl.protocol !== 'https:') return false;
+
+  let pathname = imageUrl.pathname;
+  try {
+    pathname = decodeURIComponent(pathname);
+  } catch {
+    return false;
+  }
+  const extension = path.posix.extname(pathname).toLowerCase();
+  if (IMAGE_EXTENSIONS.has(extension)) return true;
+
+  for (const parameterName of ['fm', 'format', 'ext']) {
+    const format = imageUrl.searchParams.get(parameterName)?.toLowerCase().replace(/^\./, '');
+    if (format && REMOTE_IMAGE_FORMATS.has(format)) return true;
+  }
+
+  const hostname = imageUrl.hostname.toLowerCase();
+  if (hostname === 'images.unsplash.com' && pathname.startsWith('/photo-')) return true;
+  if (hostname === 'substackcdn.com' && pathname.startsWith('/image/')) return true;
+  return false;
 }
 
 /**
@@ -280,9 +315,14 @@ function rewriteLocalImageLinks(
       const resolvedImage = href
         ? resolveLocalContentImage(markdownFilePath, href, contentDirectory, siteBase)
         : null;
-      if (resolvedImage && fs.existsSync(resolvedImage.filePath)) {
+      const remoteImageUrl = href && isRemoteImageUrl(href) ? href : null;
+      const imageSource =
+        resolvedImage?.filePath && fs.existsSync(resolvedImage.filePath)
+          ? resolvedImage.publicUrl
+          : remoteImageUrl;
+      if (imageSource) {
         const { altText, captionText } = captionFromLinkText(elementText(child));
-        const replacement: HastNode[] = [imageElement(resolvedImage.publicUrl, altText)];
+        const replacement: HastNode[] = [imageElement(imageSource, altText)];
         if (captionText) replacement.push(captionElement(captionText));
         children.splice(index, 1, ...replacement);
         index += replacement.length - 1;
