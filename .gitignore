@@ -2,6 +2,7 @@
 .env
 /config.py
 setup.py
+build/
 *egg-info/
 **/__pycache__/
 
@@ -26,4 +27,3 @@ node_modules/
 dist/
 reader/public/pagefind/
 .github/
-
