@@ -16,6 +16,7 @@ import {
   localContentImagesIntegration,
   rehypeLocalContentImages,
 } from './src/plugins/local-content-images.ts';
+import { rehypeLocalPostLinks } from './src/plugins/local-post-links.ts';
 
 // https://astro.build/config
 const sitemapExcludedPaths = new Set(['/search/']);
@@ -54,6 +55,7 @@ export default defineConfig({
     processor: unified({
       rehypePlugins: [
         [rehypeLocalContentImages, { siteBase: configuredBase }],
+        [rehypeLocalPostLinks, { siteBase: configuredBase }],
         rehypeSlug,
         [
           rehypeAutolinkHeadings,
