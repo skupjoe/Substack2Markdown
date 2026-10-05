@@ -12,6 +12,10 @@ import config from './astro-theme-config.ts';
 import { toneExpressiveCodeOptions } from './src/config/expressive-code.ts';
 import { readingStateApiPlugin } from './src/server/plugins/reading-state.ts';
 import { annotationsApiPlugin } from './src/server/plugins/annotations.ts';
+import {
+  localContentImagesIntegration,
+  rehypeLocalContentImages,
+} from './src/plugins/local-content-images.ts';
 
 // https://astro.build/config
 const sitemapExcludedPaths = new Set(['/search/']);
@@ -35,6 +39,7 @@ export default defineConfig({
     '/posts': '/',
   },
   integrations: [
+    localContentImagesIntegration(),
     expressiveCode(toneExpressiveCodeOptions),
     mdx(),
     sitemap({
@@ -48,6 +53,7 @@ export default defineConfig({
   markdown: {
     processor: unified({
       rehypePlugins: [
+        [rehypeLocalContentImages, { siteBase: configuredBase }],
         rehypeSlug,
         [
           rehypeAutolinkHeadings,
